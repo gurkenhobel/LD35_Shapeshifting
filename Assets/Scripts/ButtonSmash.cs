@@ -1,6 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 
 public class ButtonSmash : MonoBehaviour
 {
@@ -8,23 +6,61 @@ public class ButtonSmash : MonoBehaviour
 
     public float spawnDelay = 3;
     public GameObject groupPrefab;
+    public int maxFails = 3;
     public Color failedColor;
+
+    [Range(0, 1)]
+    public int level;
+
+    private KeyCode[] level1Keys = { KeyCode.LeftArrow, KeyCode.RightArrow };
+    private KeyCode[] level2Keys = { KeyCode.LeftArrow, KeyCode.RightArrow, KeyCode.UpArrow, KeyCode.DownArrow };
 
     private KeyGroup currentGroup;
     private float timer;
     private int failedGroups;
+    private bool running = true;
 
 
-    void Awake()
+    void OnEnable()
     {
         Instance = this;
+    }
+
+    public KeyCode RandomKey()
+    {
+        KeyCode[] values;
+
+        switch (level)
+        {
+            case 0:
+                values = level1Keys;
+                break;
+            case 1:
+                values = level2Keys;
+                break;
+            default:
+                values = level1Keys;
+                break;
+        }
+
+        int random = Random.Range(0, values.Length);
+
+        return values[random];
     }
 
     void Update()
     {
         if (timer <= 0)
         {
-            SpawnGroup();
+            if (currentGroup != null)
+            {
+                if (!currentGroup.locked && !currentGroup.IsFinished())
+                {
+                    Failure();
+                }
+            }
+
+            SpawnKeyGroup();
             timer = spawnDelay;
         }
 
@@ -32,14 +68,14 @@ public class ButtonSmash : MonoBehaviour
 
         if (currentGroup != null)
         {
-            if (currentGroup.IsFailed())
+            if (!currentGroup.locked && currentGroup.IsFailed())
             {
-                failedGroups++;
+                Failure();
                 currentGroup.SetColor(failedColor);
             }
             else if (currentGroup.IsFinished())
             {
-                SpawnGroup();
+                SpawnKeyGroup();
                 timer = spawnDelay;
             }
         }
@@ -47,16 +83,32 @@ public class ButtonSmash : MonoBehaviour
         InputUpdate();
     }
 
-    private void SpawnGroup()
+    private void SpawnKeyGroup()
     {
         if (currentGroup != null)
         {
             Destroy(currentGroup.gameObject);
         }
 
+        if (!running)
+        {
+            return;
+        }
+
         GameObject groupGo = (GameObject)Instantiate(groupPrefab, transform.position, Quaternion.identity);
         currentGroup = groupGo.GetComponent<KeyGroup>();
         currentGroup.transform.SetParent(transform);
+    }
+
+    private void Failure()
+    {
+        failedGroups++;
+
+        if (failedGroups >= maxFails)
+        {
+            Debug.Log("You lost!");
+            running = false;
+        }
     }
 
     private void InputUpdate()
@@ -73,6 +125,14 @@ public class ButtonSmash : MonoBehaviour
         else if (Input.GetKeyDown(KeyCode.RightArrow))
         {
             currentGroup.Input(KeyCode.RightArrow);
+        }
+        else if (Input.GetKeyDown(KeyCode.UpArrow))
+        {
+            currentGroup.Input(KeyCode.UpArrow);
+        }
+        else if (Input.GetKeyDown(KeyCode.DownArrow))
+        {
+            currentGroup.Input(KeyCode.DownArrow);
         }
     }
 }
